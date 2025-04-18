@@ -1,20 +1,10 @@
 import { writable } from 'svelte/store';
-import { STORE_SYNC_IDENTIFIER, type User } from './userStores';
+import { type User } from './userStores';
 import { fetchUsers } from './userStores';
 
-// --- Store Name Constant ---
 export const USER_DETAIL_STORE_NAME = 'userDetailStore';
-// --- End Store Name Constant ---
 
 export const userDetailStore = writable<User | null>(null);
-
-// --- Payload Type Definition ---
-export type UserDetailStorePayload = {
-	[STORE_SYNC_IDENTIFIER]: true;
-	storeName: typeof USER_DETAIL_STORE_NAME; // Use constant for literal type
-	data: User | null;
-};
-// --- End Payload Type Definition ---
 
 export async function fetchUserDetails(id: string): Promise<User | null> {
 	console.log(`[Mock API] Fetching details for user ID: ${id}`);

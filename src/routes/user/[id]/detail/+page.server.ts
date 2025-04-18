@@ -1,11 +1,10 @@
-import { markForStoreSync } from '$lib/userStores';
-import { fetchUserDetails } from '$lib/userDetailStores';
+import { fetchAndUpdateStoreAutomatically } from '$lib/stores/sync';
+import { fetchUserDetails, USER_DETAIL_STORE_NAME } from '$lib/userDetailStores';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const userId = params.id;
-	console.log(`[+page.server.ts /user/${userId}/detail] Loading data...`);
 
 	if (!userId) {
 		throw error(400, 'User ID parameter is missing');
@@ -15,7 +14,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		if (!details) {
 			throw error(404, `User with ID ${userId} not found`);
 		}
-		return markForStoreSync(details, 'userDetailStore');
+		return fetchAndUpdateStoreAutomatically(details, USER_DETAIL_STORE_NAME);
 	});
 
 	return {

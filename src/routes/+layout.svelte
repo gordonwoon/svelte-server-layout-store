@@ -1,26 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import {
-		usersStore,
 		STORE_SYNC_IDENTIFIER,
-		type User,
-		USERS_STORE_NAME,
-		type UsersStorePayload
-	} from '$lib/userStores';
-	import {
-		userDetailStore,
-		USER_DETAIL_STORE_NAME,
-		type UserDetailStorePayload
-	} from '$lib/userDetailStores';
-
-	// Union type using imported types
-	type StoreSyncPayload = UsersStorePayload | UserDetailStorePayload;
-
-	// Use constants for store registry keys
-	const storeRegistry = {
-		[USERS_STORE_NAME]: usersStore,
-		[USER_DETAIL_STORE_NAME]: userDetailStore
-	};
+		isStoreSyncPayload,
+		updateStoreFromPayload
+	} from '$lib/stores/sync';
 
 	$: {
 		const currentPageData = $page.data;
@@ -34,6 +18,7 @@
 						try {
 							value = await value;
 						} catch (error) {
+							// Check if the error itself might be a sync payload
 							if (error && typeof error === 'object' && STORE_SYNC_IDENTIFIER in error) {
 								value = error;
 							} else {
@@ -43,28 +28,10 @@
 						}
 					}
 
-					if (
-						value &&
-						typeof value === 'object' &&
-						!Array.isArray(value) &&
-						STORE_SYNC_IDENTIFIER in value &&
-						value[STORE_SYNC_IDENTIFIER] === true &&
-						'storeName' in value &&
-						(value.storeName === USERS_STORE_NAME || value.storeName === USER_DETAIL_STORE_NAME)
-					) {
-						const payload = value as StoreSyncPayload;
-						const storeName = payload.storeName;
-
-						console.log(`[$layout.svelte] Dynamically updating store '${storeName}'.`);
-
-						switch (storeName) {
-							case USERS_STORE_NAME:
-								storeRegistry[storeName].set(payload.data);
-								break;
-							case USER_DETAIL_STORE_NAME:
-								storeRegistry[storeName].set(payload.data);
-								break;
-						}
+					// Use the type guard to check if the resolved value is a sync payload
+					if (isStoreSyncPayload(value)) {
+						// Call the central update function if it is
+						updateStoreFromPayload(value);
 					}
 				}
 			}
