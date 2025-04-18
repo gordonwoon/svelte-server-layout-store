@@ -3,6 +3,10 @@ import { writable } from 'svelte/store';
 // Define a unique identifier for store sync
 export const STORE_SYNC_IDENTIFIER = '__STORE_SYNC__';
 
+// --- Store Name Constant ---
+export const USERS_STORE_NAME = 'usersStore';
+// --- End Store Name Constant ---
+
 export interface User {
 	id: number | string;
 	name: string;
@@ -12,6 +16,14 @@ export interface User {
 }
 
 export const usersStore = writable<User[]>([]);
+
+// --- Payload Type Definition ---
+export type UsersStorePayload = {
+	[STORE_SYNC_IDENTIFIER]: true;
+	storeName: typeof USERS_STORE_NAME; // Use constant for literal type
+	data: User[];
+};
+// --- End Payload Type Definition ---
 
 // Helper function to mark data with store identifier for auto-sync
 export function markForStoreSync<T>(data: T, storeName: string) {

@@ -1,61 +1,75 @@
 <script lang="ts">
-    import { page } from '$app/stores';
-    import { usersStore, STORE_SYNC_IDENTIFIER } from '$lib/userStores';
-    import { userDetailStore } from '$lib/userDetailStores';
-    import type { User } from '$lib/userStores';
+	import { page } from '$app/stores';
+	import {
+		usersStore,
+		STORE_SYNC_IDENTIFIER,
+		type User,
+		USERS_STORE_NAME,
+		type UsersStorePayload
+	} from '$lib/userStores';
+	import {
+		userDetailStore,
+		USER_DETAIL_STORE_NAME,
+		type UserDetailStorePayload
+	} from '$lib/userDetailStores';
 
-    // Define the store registry - maps names provided by server to actual store objects
-    const storeRegistry = {
-        usersStore,
-        userDetailStore
-    };
-    type StoreRegistryKeys = keyof typeof storeRegistry;
+	// Union type using imported types
+	type StoreSyncPayload = UsersStorePayload | UserDetailStorePayload;
 
-    $: {
-        const currentPageData = $page.data;
+	// Use constants for store registry keys
+	const storeRegistry = {
+		[USERS_STORE_NAME]: usersStore,
+		[USER_DETAIL_STORE_NAME]: userDetailStore
+	};
 
-        (async () => {
-            for (const key in currentPageData) {
-                if (Object.prototype.hasOwnProperty.call(currentPageData, key)) {
-                    let value = currentPageData[key as keyof typeof currentPageData];
+	$: {
+		const currentPageData = $page.data;
 
-                    if (value instanceof Promise) {
-                        try {
-                            value = await value;
-                        } catch (error) {
-                            if (error && typeof error === 'object' && STORE_SYNC_IDENTIFIER in error) {
-                                value = error;
-                            } else {
-                                console.error(`[$layout.svelte] Error resolving promise for key ${key}:`, error);
-                                continue;
-                            }
-                        }
-                    }
+		(async () => {
+			for (const key in currentPageData) {
+				if (Object.prototype.hasOwnProperty.call(currentPageData, key)) {
+					let value = currentPageData[key as keyof typeof currentPageData];
 
-                    if (
-                        value &&
-                        typeof value === 'object' &&
-                        !Array.isArray(value) &&
-                        STORE_SYNC_IDENTIFIER in value &&
-                        (value as any)[STORE_SYNC_IDENTIFIER] === true
-                    ) {
-                        const { storeName, data: storeData } = value as { storeName: string; data: unknown };
-                        const registryKey = storeName as StoreRegistryKeys;
+					if (value instanceof Promise) {
+						try {
+							value = await value;
+						} catch (error) {
+							if (error && typeof error === 'object' && STORE_SYNC_IDENTIFIER in error) {
+								value = error;
+							} else {
+								console.error(`[$layout.svelte] Error resolving promise for key ${key}:`, error);
+								continue;
+							}
+						}
+					}
 
-                        // Check if the store name is valid in our registry
-                        if (storeRegistry[registryKey]) {
-                            console.log(`[$layout.svelte] Dynamically updating store '${storeName}'.`);
-                            // Directly call set using the store object from the registry.
-                            // Use `as any` for simplification, accepting the type safety risk.
-                            storeRegistry[registryKey].set(storeData as any);
-                        } else {
-                            console.warn(`[$layout.svelte] Store sync marker found, but no store registered for '${storeName}'`);
-                        }
-                    }
-                }
-            }
-        })();
-    }
+					if (
+						value &&
+						typeof value === 'object' &&
+						!Array.isArray(value) &&
+						STORE_SYNC_IDENTIFIER in value &&
+						value[STORE_SYNC_IDENTIFIER] === true &&
+						'storeName' in value &&
+						(value.storeName === USERS_STORE_NAME || value.storeName === USER_DETAIL_STORE_NAME)
+					) {
+						const payload = value as StoreSyncPayload;
+						const storeName = payload.storeName;
+
+						console.log(`[$layout.svelte] Dynamically updating store '${storeName}'.`);
+
+						switch (storeName) {
+							case USERS_STORE_NAME:
+								storeRegistry[storeName].set(payload.data);
+								break;
+							case USER_DETAIL_STORE_NAME:
+								storeRegistry[storeName].set(payload.data);
+								break;
+						}
+					}
+				}
+			}
+		})();
+	}
 </script>
 
 <slot />
