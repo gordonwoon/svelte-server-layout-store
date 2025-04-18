@@ -1,37 +1,38 @@
-# SvelteKit Store Auto-Population via Layout ($page store)
+# SvelteKit Store Auto-Population via Layout Data
 
-This project demonstrates automatically populating Svelte stores based on data loaded in `+page.server.ts` by reacting to changes in the `$page` store within the root layout component (`+layout.svelte`). Stores and related logic are separated by feature, and the layout dynamically updates the correct store based on a marker.
+This project demonstrates a robust method for automatically populating Svelte stores based on data loaded in `+page.server.ts`. It leverages a centralized synchronization module (`src/lib/stores/sync.ts`) that reacts to changes in `$page.data` within the root layout (`+layout.svelte`). Stores and related logic are separated by feature, and the layout dynamically updates the correct store based on markers embedded in the server data.
 
 ## Key Features
 
-- Server-side data fetching using the `load` function.
-- Data marked for specific stores using a helper function.
-- Stores organized into feature-specific files (e.g., `userStores.ts`).
-- The root layout component (`+layout.svelte`) subscribes to the `$page` store.
-- When `$page.data` changes, the layout inspects the data, finds marked items, and **dynamically updates the appropriate store** automatically based on the marker's `storeName`.
-- Page components remain simple and only need to subscribe to the relevant stores.
+- Server-side data fetching using SvelteKit's `load` function.
+- **Centralized Synchronization Logic:** A dedicated module (`src/lib/stores/sync.ts`) handles:
+  - Defining a registry of stores to be synchronized.
+  - **Dynamically generating** discriminated union types (`StoreSyncPayload`) for type-safe handling of different store data structures.
+  - Providing a server-side helper function (`fetchAndUpdateStoreAutomatically`) to correctly format data before sending it to the client.
+  - Providing a type guard (`isStoreSyncPayload`) to identify sync payloads on the client.
+  - Providing a client-side update function (`updateStoreFromPayload`) that performs type-safe store updates.
+- **Simplified Root Layout:** The root layout (`+layout.svelte`) imports and uses functions from the `sync.ts` module, keeping its own logic minimal.
+- Stores organized into feature-specific files (e.g., `userStores.ts`, `userDetailStores.ts`).
+- Page components remain simple, only needing to subscribe to the relevant stores.
 
 ## How It Works
 
-### 1. Store Definition and Marking (e.g., `src/lib/userStores.ts`)
+### 1. Store Definition (e.g., `src/lib/userStores.ts`)
 
-Feature-specific store files define the store, related types/interfaces, data fetching functions, and potentially shared utilities like the sync marker:
+Feature-specific store files define the store instance, related types/interfaces, data fetching functions, and an exported constant for the store's unique name.
 
 ```typescript
 // src/lib/userStores.ts
 import { writable } from 'svelte/store';
 
-export const STORE_SYNC_IDENTIFIER = '__STORE_SYNC__';
+// Export a unique name for this store
+export const USERS_STORE_NAME = 'usersStore';
 
 export interface User {
 	/* ... */
 }
 
 export const usersStore = writable<User[]>([]);
-
-export function markForStoreSync<T>(data: T, storeName: string) {
-	/* ... */
-}
 
 export async function fetchUsers(): Promise<User[]> {
 	/* ... */
@@ -43,6 +44,9 @@ export async function fetchUsers(): Promise<User[]> {
 import { writable } from 'svelte/store';
 import type { User } from './userStores';
 
+// Export a unique name for this store
+export const USER_DETAIL_STORE_NAME = 'userDetailStore';
+
 export const userDetailStore = writable<User | null>(null);
 
 export async function fetchUserDetails(id: string): Promise<User | null> {
@@ -50,37 +54,81 @@ export async function fetchUserDetails(id: string): Promise<User | null> {
 }
 ```
 
-### 2. Server-Side Load Function (e.g., `+page.server.ts` or `user/[id]/detail/+page.server.ts`)
+### 2. Server-Side Load Function (e.g., `+page.server.ts`)
 
-The page's server `load` function imports the necessary fetcher and marker functions, fetches data, and uses `markForStoreSync` before returning promises:
+The page's server `load` function imports the necessary data fetchers, store name constants, and the `fetchAndUpdateStoreAutomatically` helper from the central `sync.ts` module. It fetches data and uses `fetchAndUpdateStoreAutomatically` to wrap it before returning.
 
 ```typescript
-// src/routes/user/[id]/detail/+page.server.ts
-import { markForStoreSync } from '$lib/userStores';
-import { fetchUserDetails } from '$lib/userDetailStores';
+// src/routes/+page.server.ts (Example for users list)
+import { fetchUsers, USERS_STORE_NAME } from '$lib/userStores';
+// Import the renamed function from sync module
+import { fetchAndUpdateStoreAutomatically } from '$lib/stores/sync';
 
-export const load: PageServerLoad = async ({ params }) => {
-	const userDetailPromise = fetchUserDetails(params.id).then((details) => {
-		if (!details) throw error(404, 'Not Found');
-		return markForStoreSync(details, 'userDetailStore');
+export const load: PageServerLoad = async () => {
+	const usersPromise = fetchUsers().then((users) => {
+		// Use the renamed helper and the store name constant
+		return fetchAndUpdateStoreAutomatically(users, USERS_STORE_NAME);
 	});
-	return { userDetail: userDetailPromise, userId: params.id };
+	return { users: usersPromise };
 };
 ```
 
-### 3. Root Layout Component (`+layout.svelte`)
+### 3. Central Synchronization Logic (`src/lib/stores/sync.ts`)
 
-The layout imports all stores that can be auto-populated and defines a `storeRegistry` mapping names to store objects. The reactive logic finds marked data and uses the `storeName` to dynamically call `.set()` on the correct store from the registry (using `as any` for simplification).
+This module is the core of the auto-population mechanism. It imports stores and their names, defines the registry, dynamically generates types, and exports the necessary functions.
+
+```typescript
+// src/lib/stores/sync.ts
+import * as UserDetailStores from '../userDetailStores';
+import * as UserStores from '../userStores';
+
+// Define the sync identifier
+export const STORE_SYNC_IDENTIFIER = '__STORE_SYNC__';
+
+// Define the central registry
+const storeRegistry = {
+	[UserStores.USERS_STORE_NAME]: UserStores.usersStore,
+	[UserDetailStores.USER_DETAIL_STORE_NAME]: UserDetailStores.userDetailStore
+} as const;
+
+// --- Dynamic Type Generation ---
+type StoreSetParam<S> = /* ... */ ;
+type StorePayloadMap = { /* ... Mapped type based on storeRegistry ... */ };
+export type StoreSyncPayload = StorePayloadMap[keyof StorePayloadMap]; // Discriminated Union
+// --- End Dynamic Type Generation ---
+
+// Server-side helper to create payloads (renamed)
+export function fetchAndUpdateStoreAutomatically<K extends keyof typeof storeRegistry, /* ... */>(
+    data: T,
+    storeName: K
+): StorePayloadMap[K] {
+	return { /* ... returns marked payload object ... */ };
+}
+
+// Client-side type guard
+export function isStoreSyncPayload(value: unknown): value is StoreSyncPayload {
+    /* ... checks for marker and valid storeName ... */
+}
+
+// Client-side update function
+export function updateStoreFromPayload(payload: StoreSyncPayload): boolean {
+    /* ... uses switch on payload.storeName ... */
+}
+```
+
+### 4. Root Layout Component (`+layout.svelte`)
+
+The layout imports only the necessary functions from `sync.ts`. It subscribes to `$page.data`, iterates over the data, uses the type guard to identify sync payloads, and calls the update function.
 
 ```svelte
 <!-- src/routes/+layout.svelte -->
 <script lang="ts">
     import { page } from '$app/stores';
-    import { usersStore, STORE_SYNC_IDENTIFIER } from '$lib/userStores';
-    import { userDetailStore } from '$lib/userDetailStores';
-
-    // Map store names (from server) to actual store objects
-    const storeRegistry = { usersStore, userDetailStore };
+    import {
+        STORE_SYNC_IDENTIFIER, // May not be needed directly here anymore
+        isStoreSyncPayload,
+        updateStoreFromPayload
+    } from '$lib/stores/sync';
 
     $: {
         const currentPageData = $page.data;
@@ -88,16 +136,11 @@ The layout imports all stores that can be auto-populated and defines a `storeReg
             for (const key in currentPageData) {
                 // ... await promise logic ...
                 let value = /* resolved value */;
-                if (/* value is marked */) {
-                    const { storeName, data: storeData } = value as { storeName: string; data: unknown };
-                    const registryKey = storeName as keyof typeof storeRegistry;
 
-                    if (storeRegistry[registryKey]) {
-                        // Dynamically update the store
-                        storeRegistry[registryKey].set(storeData as any);
-                    } else {
-                        console.warn(`No store registered for '${storeName}'`);
-                    }
+                // Use the type guard
+                if (isStoreSyncPayload(value)) {
+                    // Call the central update function
+                    updateStoreFromPayload(value);
                 }
             }
         })();
@@ -107,40 +150,43 @@ The layout imports all stores that can be auto-populated and defines a `storeReg
 <slot />
 ```
 
-### 4. Page Component (e.g., `+page.svelte` or `user/[id]/detail/+page.svelte`)
+### 5. Page Component (e.g., `+page.svelte`)
 
-The page component imports only the specific store(s) it needs to display data from and uses them directly:
+The page component remains simple, importing only the specific store(s) it needs and using them directly.
 
 ```svelte
-<!-- src/routes/user/[id]/detail/+page.svelte -->
+<!-- src/routes/+page.svelte -->
 <script lang="ts">
-	import { userDetailStore } from '$lib/userDetailStores';
-	export let data: PageData;
+	import { usersStore } from '$lib/userStores';
 </script>
 
-{#if $userDetailStore}
-	<!-- Display $userDetailStore data -->
-{/if}
+{#each $usersStore as user}
+	<!-- ... display user -->
+{/each}
 ```
 
 ## Benefits of This Approach
 
-1.  **Centralized & Dynamic Logic:** Store update logic is in the layout and dynamically handles different stores.
-2.  **Cleaner Pages:** Page components focus on displaying data.
-3.  **Modular Stores:** Stores organized by feature.
-4.  **Easier Maintenance:** Adding new auto-populated stores only requires adding them to the layout's `storeRegistry`.
+1.  **Centralized & Dynamic Logic:** Store update logic is contained within `sync.ts` and dynamically handles different stores based on the registry.
+2.  **Improved Type Safety:** The use of discriminated unions, mapped types, and type guards ensures type-safe updates, eliminating previous reliance on `as any`.
+3.  **Simplified Layout:** The root layout component (`+layout.svelte`) is significantly cleaner and delegates complex logic.
+4.  **High Maintainability:** Adding new auto-populated stores primarily involves updating the store file itself and adding it to the `storeRegistry` in `sync.ts`. The layout and page components often require no changes.
+5.  **Modular Stores:** Stores remain organized by feature.
 
 ## Considerations
 
-- **Type Safety Trade-off:** The dynamic `storeRegistry[registryKey].set(storeData as any)` call bypasses strict TypeScript checks. Ensure the `storeName` passed from the server correctly matches the data type.
-- The layout needs to import _all_ potentially auto-populated stores to include them in the registry.
-- The reactive block runs on every `$page` change.
+- The core complexity is shifted to the `sync.ts` module, which utilizes advanced TypeScript features (Mapped Types, Conditional Types).
+- Ensure consistency between the `storeName` constants exported from store files and those used in `sync.ts` and server `load` functions.
 
-## Running the Project
+## Online Demo
+
+You can try this demo without any setup by visiting the CodeSandbox link below:
+
+[Open in CodeSandbox](https://codesandbox.io/p/github/gordonwoon/svelte-server-layout-store/main)
+
+## Running the Project Locally
 
 ```bash
 npm install
 npm run dev
 ```
-
-Then open your browser to [http://localhost:5173](http://localhost:5173).
