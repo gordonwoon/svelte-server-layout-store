@@ -9,7 +9,7 @@ export const userDetailStore = createStoreWithLoadingAndError<User | null>(null)
 export async function fetchUserDetails(id: string): Promise<User | null> {
 	console.log(`[Mock API] Fetching details for user ID: ${id}`);
 	// Simulate API delay
-	await new Promise((resolve) => setTimeout(resolve, 800));
+	await new Promise((resolve) => setTimeout(resolve, 2000));
 
 	const users = await fetchUsers();
 	const user = users.find((u) => u.id.toString() === id);
