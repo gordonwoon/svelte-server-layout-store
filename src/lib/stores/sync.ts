@@ -8,22 +8,26 @@ const storeRegistry = {
 	[UserDetailStores.USER_DETAIL_STORE_NAME]: UserDetailStores.userDetailStore
 } as const;
 
-export function updateStoreFromPayload(payload: StoreSyncPayload): boolean {
+export async function updateStoreFromPayload(payload: StoreSyncPayload): Promise<boolean> {
+	console.log('updateStoreFromPayload', payload);
 	const storeName = payload.storeName;
 
 	// console.log(`[StoreSync] Dynamically updating store '${storeName}'.`);
 	switch (storeName) {
 		case UserStores.USERS_STORE_NAME:
-			storeRegistry[storeName].set(payload.data);
+			storeRegistry[storeName].set(await payload.data);
 			break;
 		case UserDetailStores.USER_DETAIL_STORE_NAME:
-			storeRegistry[storeName].set(payload.data);
+			storeRegistry[storeName].set(await payload.data);
 			break;
 	}
 	return true;
 }
 
-export function fetchAndUpdateStoreAutomatically<T>(data: T, storeName: string) {
+export async function fetchAndUpdateStoreAutomatically<T>(
+	data: T | Promise<T>,
+	storeName: StoreSyncPayload['storeName']
+) {
 	return {
 		[STORE_SYNC_IDENTIFIER]: true,
 		storeName: storeName,
@@ -53,6 +57,7 @@ type PotentialPayload = {
 
 // Type guard to check if an unknown value is a valid sync payload
 export function isStoreSyncPayload(value: unknown): value is StoreSyncPayload {
+	console.log('value', value);
 	if (value && typeof value === 'object' && !Array.isArray(value)) {
 		const potential = value as PotentialPayload;
 		// Check for the identifier and that storeName is one of the *known keys* from our registry

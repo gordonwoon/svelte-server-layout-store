@@ -10,15 +10,8 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw error(400, 'User ID parameter is missing');
 	}
 
-	const userDetailPromise = fetchUserDetails(userId).then((details) => {
-		if (!details) {
-			throw error(404, `User with ID ${userId} not found`);
-		}
-		return fetchAndUpdateStoreAutomatically(details, USER_DETAIL_STORE_NAME);
-	});
-
 	return {
-		userDetail: userDetailPromise,
+		userDetail: fetchAndUpdateStoreAutomatically(fetchUserDetails(userId), USER_DETAIL_STORE_NAME),
 		userId: userId
 	};
 };

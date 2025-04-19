@@ -27,6 +27,7 @@
 							}
 						}
 					}
+					console.log('isStoreSyncPayload', isStoreSyncPayload(value));
 
 					// Use the type guard to check if the resolved value is a sync payload
 					if (isStoreSyncPayload(value)) {
