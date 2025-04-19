@@ -1,7 +1,8 @@
-import * as UserDetailStores from '../userDetailStores';
-import * as UserStores from '../userStores';
-
 export const STORE_SYNC_IDENTIFIER = '__STORE_SYNC__';
+
+import { writable, type Writable } from 'svelte/store';
+import * as UserDetailStores from './userDetailStores';
+import * as UserStores from './userStores';
 
 const storeRegistry = {
 	[UserStores.USERS_STORE_NAME]: UserStores.usersStore,
@@ -9,18 +10,20 @@ const storeRegistry = {
 } as const;
 
 export async function updateStoreFromPayload(payload: StoreSyncPayload): Promise<boolean> {
-	console.log('updateStoreFromPayload', payload);
 	const storeName = payload.storeName;
+	console.log(`[StoreSync] Dynamically updating store '${storeName}'.`);
+	storeRegistry[storeName].loading.set(true);
 
-	// console.log(`[StoreSync] Dynamically updating store '${storeName}'.`);
 	switch (storeName) {
 		case UserStores.USERS_STORE_NAME:
 			storeRegistry[storeName].set(await payload.data);
 			break;
 		case UserDetailStores.USER_DETAIL_STORE_NAME:
 			storeRegistry[storeName].set(await payload.data);
+			storeRegistry[storeName].loading.set(false);
 			break;
 	}
+	storeRegistry[storeName].loading.set(false);
 	return true;
 }
 
@@ -57,7 +60,6 @@ type PotentialPayload = {
 
 // Type guard to check if an unknown value is a valid sync payload
 export function isStoreSyncPayload(value: unknown): value is StoreSyncPayload {
-	console.log('value', value);
 	if (value && typeof value === 'object' && !Array.isArray(value)) {
 		const potential = value as PotentialPayload;
 		// Check for the identifier and that storeName is one of the *known keys* from our registry
@@ -68,4 +70,32 @@ export function isStoreSyncPayload(value: unknown): value is StoreSyncPayload {
 		);
 	}
 	return false;
+}
+
+/**
+ * Creates a store with loading and error states
+ *
+ * @param initialValue - Initial value for the store
+ * @returns A store with initialize, handleError, handleLoading and other utility methods
+ */
+export function createStoreWithLoadingAndError<T>(initialValue: T): Writable<T> & {
+	initialize: (data: T) => T;
+	reset: () => void;
+	loading: Writable<boolean>;
+	error: Writable<Error | null>;
+} {
+	// Create the base writable store
+	const { subscribe, set, update } = writable<T>(initialValue);
+
+	// Loading and error states
+	const loading = writable<boolean>(false);
+	const error = writable<Error | null>(null);
+
+	return {
+		subscribe,
+		set,
+		update,
+		loading,
+		error
+	};
 }

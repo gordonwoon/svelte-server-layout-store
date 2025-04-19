@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { createStoreWithLoadingAndError } from './storeHelper';
 
 export const USERS_STORE_NAME = 'usersStore';
 
@@ -10,12 +10,12 @@ export interface User {
 	phone?: string;
 }
 
-export const usersStore = writable<User[]>([]);
+export const usersStore = createStoreWithLoadingAndError<User[] | null>(null);
 
 export async function fetchUsers(): Promise<User[]> {
 	console.log('[Mock API] Fetching user list...');
 	// Simulate API delay
-	await new Promise((resolve) => setTimeout(resolve, 500));
+	await new Promise((resolve) => setTimeout(resolve, 2000));
 
 	return [
 		{ id: 1, name: 'John Doe', email: 'john@example.com' },

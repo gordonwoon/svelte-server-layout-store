@@ -1,7 +1,7 @@
-import { fetchAndUpdateStoreAutomatically } from '$lib/stores/sync';
-import { fetchUserDetails, USER_DETAIL_STORE_NAME } from '$lib/userDetailStores';
-import type { PageServerLoad } from './$types';
+import { fetchAndUpdateStoreAutomatically } from '$lib/stores/storeHelper';
+import { fetchUserDetails, USER_DETAIL_STORE_NAME } from '$lib/stores/userDetailStores';
 import { error } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const userId = params.id;

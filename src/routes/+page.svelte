@@ -1,6 +1,9 @@
 <script lang="ts">
-	import { usersStore } from '$lib/userStores';
+	import { usersStore } from '$lib/stores/userStores';
 
+	// Extract nested stores for clarity and potentially better type inference
+	$: loading = usersStore.loading;
+	$: error = usersStore.error;
 </script>
 
 <main>
@@ -9,18 +12,25 @@
 	<div class="container">
 		<div class="box">
 			<h2>Users</h2>
-			{#if $usersStore.length > 0}
+
+			{#if $loading}
+				<p>Loading users...</p>
+			{:else if $error}
+				<p style="color: red;">Error loading users: {$error.message}</p>
+			{:else if $usersStore && $usersStore.length > 0}
 				<ul>
 					{#each $usersStore as user}
 						<li>
 							<strong>{user.name}</strong> ({user.email})
 							<!-- Link to detail page -->
-							<a href="/user/{user.id}/detail" style="margin-left: 1em; font-size: 0.9em;">(View Details)</a>
+							<a href="/user/{user.id}/detail" style="margin-left: 1em; font-size: 0.9em;"
+								>(View Details)</a
+							>
 						</li>
 					{/each}
 				</ul>
 			{:else}
-				<p>Loading users...</p>
+				<p>No users found.</p>
 			{/if}
 		</div>
 	</div>
@@ -28,10 +38,9 @@
 	<div class="info">
 		<h3>How This Works (Layout Method)</h3>
 		<p>
-			The server-side load function returns promises wrapped with an identifier.
-			The root layout's client-side <code>script</code> reacts to <code>$page.data</code> changes.
-			It checks for the identifier, unwraps the data, and updates the stores.
-			The page component simply uses the stores directly.
+			The server-side load function returns promises wrapped with an identifier. The root layout's
+			client-side <code>script</code> reacts to <code>$page.data</code> changes. It checks for the identifier,
+			unwraps the data, and updates the stores. The page component simply uses the stores directly.
 		</p>
 	</div>
 </main>

@@ -1,18 +1,21 @@
 <script lang="ts">
-	import { userDetailStore } from '$lib/userDetailStores';
+	import { userDetailStore } from '$lib/stores/userDetailStores';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
 
-	$: isLoading = !$userDetailStore || $userDetailStore.id?.toString() !== data.userId?.toString();
+	$: loading = userDetailStore.loading;
+	$: error = userDetailStore.error;
 </script>
 
 <main>
 	<h1>User Details (User ID: {data.userId})</h1>
 	<a href="/">&larr; Back to Home</a>
 
-	{#if isLoading}
+	{#if $loading}
 		<p>Loading user details...</p>
+	{:else if $error}
+		<p class="error">Error loading user details: {$error.message}</p>
 	{:else if $userDetailStore}
 		<div class="detail-card">
 			<h2>{$userDetailStore.name}</h2>

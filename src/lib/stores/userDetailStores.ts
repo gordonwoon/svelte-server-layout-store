@@ -1,10 +1,10 @@
-import { writable } from 'svelte/store';
 import { type User } from './userStores';
 import { fetchUsers } from './userStores';
+import { createStoreWithLoadingAndError } from './storeHelper';
 
 export const USER_DETAIL_STORE_NAME = 'userDetailStore';
 
-export const userDetailStore = writable<User | null>(null);
+export const userDetailStore = createStoreWithLoadingAndError<User | null>(null);
 
 export async function fetchUserDetails(id: string): Promise<User | null> {
 	console.log(`[Mock API] Fetching details for user ID: ${id}`);

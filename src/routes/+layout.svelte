@@ -4,7 +4,7 @@
 		STORE_SYNC_IDENTIFIER,
 		isStoreSyncPayload,
 		updateStoreFromPayload
-	} from '$lib/stores/sync';
+	} from '$lib/stores/storeHelper';
 
 	$: {
 		const currentPageData = $page.data;
