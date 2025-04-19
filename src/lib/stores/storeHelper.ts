@@ -1,4 +1,4 @@
-export const STORE_SYNC_IDENTIFIER = '__STORE_SYNC__';
+export const STORE_UPDATE_SIGNATURE = '__STORE_SIGNATURE__';
 
 import { writable, type Writable } from 'svelte/store';
 import * as UserDetailStores from './userDetailStores';
@@ -32,7 +32,7 @@ export async function fetchAndUpdateStoreAutomatically<T>(
 	storeName: StoreSyncPayload['storeName']
 ) {
 	return {
-		[STORE_SYNC_IDENTIFIER]: true,
+		[STORE_UPDATE_SIGNATURE]: true,
 		storeName: storeName,
 		data
 	};
@@ -44,7 +44,7 @@ type StoreSetParam<S> = S extends { set: (value: infer P) => void } ? P : never;
 // 1. Map store names (keys of registry) to their specific payload structures
 type StorePayloadMap = {
 	[K in keyof typeof storeRegistry]: {
-		[STORE_SYNC_IDENTIFIER]: true;
+		[STORE_UPDATE_SIGNATURE]: true;
 		storeName: K; // K is the literal type, e.g., 'usersStore'
 		// Extract the data type expected by the corresponding store's set method
 		data: StoreSetParam<(typeof storeRegistry)[K]>;
@@ -59,12 +59,12 @@ type PotentialPayload = {
 };
 
 // Type guard to check if an unknown value is a valid sync payload
-export function isStoreSyncPayload(value: unknown): value is StoreSyncPayload {
+export function isStoreSignaturePayload(value: unknown): value is StoreSyncPayload {
 	if (value && typeof value === 'object' && !Array.isArray(value)) {
 		const potential = value as PotentialPayload;
 		// Check for the identifier and that storeName is one of the *known keys* from our registry
 		return (
-			potential[STORE_SYNC_IDENTIFIER] === true &&
+			potential[STORE_UPDATE_SIGNATURE] === true &&
 			typeof potential.storeName === 'string' &&
 			potential.storeName in storeRegistry
 		);
@@ -79,8 +79,6 @@ export function isStoreSyncPayload(value: unknown): value is StoreSyncPayload {
  * @returns A store with initialize, handleError, handleLoading and other utility methods
  */
 export function createStoreWithLoadingAndError<T>(initialValue: T): Writable<T> & {
-	initialize: (data: T) => T;
-	reset: () => void;
 	loading: Writable<boolean>;
 	error: Writable<Error | null>;
 } {

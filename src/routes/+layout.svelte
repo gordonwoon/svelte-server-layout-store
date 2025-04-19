@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import {
-		STORE_SYNC_IDENTIFIER,
-		isStoreSyncPayload,
+		isStoreSignaturePayload,
+		STORE_UPDATE_SIGNATURE,
 		updateStoreFromPayload
 	} from '$lib/stores/storeHelper';
 
@@ -19,7 +19,7 @@
 							value = await value;
 						} catch (error) {
 							// Check if the error itself might be a sync payload
-							if (error && typeof error === 'object' && STORE_SYNC_IDENTIFIER in error) {
+							if (error && typeof error === 'object' && STORE_UPDATE_SIGNATURE in error) {
 								value = error;
 							} else {
 								console.error(`[$layout.svelte] Error resolving promise for key ${key}:`, error);
@@ -27,10 +27,9 @@
 							}
 						}
 					}
-					console.log('isStoreSyncPayload', isStoreSyncPayload(value));
 
 					// Use the type guard to check if the resolved value is a sync payload
-					if (isStoreSyncPayload(value)) {
+					if (isStoreSignaturePayload(value)) {
 						// Call the central update function if it is
 						updateStoreFromPayload(value);
 					}
