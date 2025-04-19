@@ -14,15 +14,16 @@ export async function updateStoreFromPayload(payload: StoreSyncPayload): Promise
 	console.log(`[StoreSync] Dynamically updating store '${storeName}'.`);
 	storeRegistry[storeName].loading.set(true);
 
+	// to ensure type safety with discriminated union, we need to switch on the storeName
 	switch (storeName) {
 		case UserStores.USERS_STORE_NAME:
 			storeRegistry[storeName].set(await payload.data);
 			break;
 		case UserDetailStores.USER_DETAIL_STORE_NAME:
 			storeRegistry[storeName].set(await payload.data);
-			storeRegistry[storeName].loading.set(false);
 			break;
 	}
+
 	storeRegistry[storeName].loading.set(false);
 	return true;
 }
@@ -47,7 +48,9 @@ type StorePayloadMap = {
 		[STORE_UPDATE_SIGNATURE]: true;
 		storeName: K; // K is the literal type, e.g., 'usersStore'
 		// Extract the data type expected by the corresponding store's set method
-		data: StoreSetParam<(typeof storeRegistry)[K]>;
+		data:
+			| StoreSetParam<(typeof storeRegistry)[K]>
+			| Promise<StoreSetParam<(typeof storeRegistry)[K]>>;
 	};
 };
 
